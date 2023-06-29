@@ -1,24 +1,34 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const headers = {
-	'Content-type': 'application/json',
-	Accept: 'application/json',
-};
-
 const baseUrl = __APP_ENV__.API_URL;
 
 const getAuthToken = () => localStorage.getItem('authToken');
 
 export const laasApi = createApi({
 	reducerPath: 'api',
-	baseQuery: fetchBaseQuery({ baseUrl }),
+	baseQuery: fetchBaseQuery({
+		baseUrl,
+		prepareHeaders: (headers) => {
+			const token = getAuthToken();
+			if (token) {
+				headers.set('Authorization', `Bearer ${token}`);
+			}
+
+			headers.set('Content-type', 'application/json');
+			headers.set('Accept', 'application/json');
+			return headers;
+		},
+	}),
+	refetchOnReconnect: true,
+	keepUnusedDataFor: 2 * 60,
+	tagTypes: ['Apps'],
+
 	endpoints: (builder) => ({
 		login: builder.mutation({
 			query: (body) => ({
 				url: 'auth/login',
 				method: 'POST',
 				body,
-				headers,
 			}),
 		}),
 		signup: builder.mutation({
@@ -26,7 +36,6 @@ export const laasApi = createApi({
 				url: 'auth/register',
 				method: 'POST',
 				body,
-				headers,
 			}),
 		}),
 
@@ -34,10 +43,6 @@ export const laasApi = createApi({
 			query: () => ({
 				url: 'auth',
 				method: 'GET',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
 		}),
 
@@ -45,57 +50,43 @@ export const laasApi = createApi({
 			query: () => ({
 				url: 'apps',
 				method: 'GET',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
+			providesTags: ['Apps'],
 		}),
 
 		getApp: builder.query({
 			query: (id) => ({
 				url: 'apps/' + id,
 				method: 'GET',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
+			providesTags: ['App'],
 		}),
 
 		getAppLogs: builder.query({
-			query: ({ appId, page = 1, count = 20 }) => {
+			query: ({ appId, page = 1, count = 20, filter }) => {
 				return {
-					url: `logs/${appId}?page=${page}&count=${count}`,
+					url: `logs/${appId}?page=${page}&count=${count}&level=${
+						filter?.level || ''
+					}&search=${filter?.search || ''}`,
 					method: 'GET',
-					headers: {
-						...headers,
-						Authorization: `Bearer ${getAuthToken()}`,
-					},
 				};
 			},
+			providesTags: ['Logs'],
 		}),
 
 		createApp: builder.mutation({
 			query: (body) => ({
 				url: 'apps/new',
 				method: 'POST',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 				body,
 			}),
+			invalidatesTags: ['Apps'],
 		}),
 
 		generareAppToken: builder.mutation({
 			query: (appId) => ({
 				url: `apps/${appId}/token`,
 				method: 'POST',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
 		}),
 
@@ -103,10 +94,6 @@ export const laasApi = createApi({
 			query: (logId) => ({
 				url: `logs/${logId}/delete`,
 				method: 'DELETE',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
 		}),
 
@@ -114,11 +101,17 @@ export const laasApi = createApi({
 			query: (appId) => ({
 				url: `logs/${appId}`,
 				method: 'DELETE',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${getAuthToken()}`,
-				},
 			}),
+			invalidatesTags: ['Logs'],
+		}),
+
+		updateApp: builder.mutation({
+			query: (data) => ({
+				url: `apps/${data.id}/update`,
+				method: 'PATCH',
+				body: data.body,
+			}),
+			invalidatesTags: (result, error, arg) => ['Apps', 'App'],
 		}),
 	}),
 });
@@ -134,4 +127,5 @@ export const {
 	useGenerareAppTokenMutation,
 	useDeleteLogMutation,
 	useClearLogsMutation,
+	useUpdateAppMutation,
 } = laasApi;

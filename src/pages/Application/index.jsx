@@ -13,6 +13,7 @@ import io from 'socket.io-client';
 import ProgressLoader from '../../components/Loaders/ProgessLoader';
 import AppHeader from '../../components/AppHeader';
 import Log from '../../components/Log';
+import LogFilterPanel from '../../components/LogFilterPanel';
 import PageSwitcher from '../../components/PageSwitcher';
 
 const socket = io(__APP_ENV__.API_URL);
@@ -33,6 +34,7 @@ const AppTokenGenerator = ({ onClick }) => (
 );
 
 const Application = () => {
+	const [logFilter, setLogsFilter] = useState({});
 	const [page, setPage] = useState(1);
 	const [additionalLogs, setAdditionalLogs] = useState([]);
 
@@ -40,7 +42,12 @@ const Application = () => {
 
 	socket.emit('join', id);
 
-	const logsHook = useGetAppLogsQuery({ appId: id, page, count: 20 });
+	const logsHook = useGetAppLogsQuery({
+		appId: id,
+		page,
+		count: 20,
+		filter: logFilter,
+	});
 
 	const appHook = useGetAppQuery(id);
 
@@ -64,11 +71,11 @@ const Application = () => {
 		};
 	}, []);
 
-	const deleteAllLogs = async () => {
-		setAdditionalLogs([]);
-		await clearLogs(id);
-		logsHook.refetch();
-	};
+	// const deleteAllLogs = async () => {
+	// 	setAdditionalLogs([]);
+	// 	await clearLogs(id);
+	// 	logsHook.refetch();
+	// };
 
 	const deleteLogHandler = (logId) => {
 		return async () => {
@@ -81,18 +88,26 @@ const Application = () => {
 		<>
 			{logsHook.isFetching && <ProgressLoader />}
 			{(appHook.isLoading || appHook.isFetching) && <ProgressLoader />}
-			{(!appHook.isLoading || appHook.isSuccess) && (
+			{!appHook.isLoading || appHook.isSuccess ? (
 				<>
-					<AppHeader app={appHook.data.data} />
+					<AppHeader
+						app={appHook.data.data}
+						refetchAppLogs={logsHook.refetch}
+					/>
 				</>
+			) : (
+				<></>
 			)}
 
 			{(logsHook.isFetching || logsHook.isLoading) && <ProgressLoader />}
 			<>
 				<PageSwitcher
+					appId={appHook?.data?.data?._id}
 					page={page}
 					setPage={setPage}
 					logs={{ ...logsHook.data, data: null }}
+					logsHook={logsHook}
+					setLogsFilter={setLogsFilter}
 				/>
 			</>
 			{logsHook.isSuccess &&
@@ -107,11 +122,8 @@ const Application = () => {
 					/>
 				) : (
 					<>
-						<div
-							className="container bg-primary"
-							style={{ wordBreak: 'break-word' }}
-						>
-							{appHook?.data?.data?.token}
+						<div className="container" style={{ wordBreak: 'break-word' }}>
+							<div className="p-2 bg-primary">{appHook?.data?.data?.token}</div>
 						</div>
 						{
 							<LogList
